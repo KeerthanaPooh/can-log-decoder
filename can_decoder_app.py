@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
 
 # --- PGN → SPN mapping ---
 PGN_MAP = {
@@ -29,9 +30,9 @@ def decode_value(data_bytes, rule):
     phys_val = raw_dec * rule["res"] + rule["offset"]
     return raw_hex, str(raw_dec), f"{phys_val:.2f} {rule['unit']}"
 
-def process_log(file):
+def process_log_from_lines(lines):
     rows = []
-    for line in file.getvalue().decode("utf-8-sig").splitlines():
+    for line in lines:
         parts = line.strip().split()
         if len(parts) >= 11:
             can_id_hex = parts[0]
@@ -61,18 +62,24 @@ def process_log(file):
     return pd.DataFrame(rows)
 
 # --- Streamlit UI ---
-st.set_page_config(page_title="CAN Log Decoder", layout="wide")
-
 st.title("🚛 CAN Log Decoder (PGN → SPN)")
 
 uploaded_file = st.file_uploader("Upload CAN Log File", type=["log", "txt"])
+pasted_text = st.text_area("Or paste CAN log content here")
 
+df = None
 if uploaded_file:
-    df = process_log(uploaded_file)
+    lines = uploaded_file.getvalue().decode("utf-8-sig").splitlines()
+    df = process_log_from_lines(lines)
+elif pasted_text.strip():
+    lines = pasted_text.splitlines()
+    df = process_log_from_lines(lines)
+
+if df is not None:
     if df.empty:
-        st.warning("⚠️ No matching PGN/SPN data found in this file.")
+        st.warning("⚠️ No matching PGN/SPN data found.")
     else:
-        st.success("✅ File processed successfully!")
+        st.success("✅ Processed successfully!")
         st.dataframe(df, use_container_width=True)
 
         # Excel download
